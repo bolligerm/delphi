@@ -95,6 +95,7 @@ var
   DictItem: TPair<string, Integer>;
 begin
   inherited;
+  // TODO: Must remove OldString from FLookupDict, similar to how it's done in Put()
   for DictItem in FLookupDict do
     if DictItem.Value > Index then  // If this item was "to the right" of the newly inserted one,
       FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step down.
