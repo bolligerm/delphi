@@ -96,7 +96,7 @@ var
 begin
   inherited;
   for DictItem in FLookupDict do
-    if DictItem.Value >= Index then  // If this item was "to the right" of the newly inserted one,
+    if DictItem.Value > Index then  // If this item was "to the right" of the newly inserted one,
       FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step down.
 end;
 
@@ -136,7 +136,7 @@ begin
     // S was added somewhere inside the list (not at the end)
     // - trickier case: we need to update all shifted indexes in the dictionary
     for DictItem in FLookupDict do
-      if DictItem.Value >= Index then  // If this item was "to the right" of the newly inserted one,
+      if DictItem.Value >= Index then  // If this item was at or "to the right" of the newly inserted one,
         FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step up.
   end;
 end;
