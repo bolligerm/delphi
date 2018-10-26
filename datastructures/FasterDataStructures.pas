@@ -81,7 +81,8 @@ end;
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
   inherited;
-  RebuildLookupDict;
+  if not Sorted then
+    RebuildLookupDict;
 end;
 
 procedure TFastLookupStringList.Clear;
@@ -95,6 +96,9 @@ var
   DictItem: TPair<string, Integer>;
 begin
   inherited;
+  if Sorted then
+    Exit;
+
   // TODO: Must remove OldString from FLookupDict, similar to how it's done in Put()
   for DictItem in FLookupDict do
     if DictItem.Value > Index then  // If this item was "to the right" of the newly inserted one,
@@ -105,6 +109,12 @@ procedure TFastLookupStringList.Exchange(Index1, Index2: Integer);
 var
   s1, s2: string;
 begin
+  if Sorted then
+  begin
+    inherited;
+    Exit;
+  end;
+
   s1 := Strings[Index1];
   s2 := Strings[Index2];
   inherited;
@@ -124,22 +134,38 @@ procedure TFastLookupStringList.InsertItem(Index: Integer; const S: string;
   AObject: TObject);
 var
   DictItem: TPair<string, Integer>;
+  AlreadyExisted: Boolean;
 begin
-  inherited;
-  if Index = Count - 1 then  // (FCount has already been increased by the inherited InsertItem)
+  if Sorted then
   begin
-    // S was added at end of list
-    // - simple case: we just add the new item to the dictionary
-    FLookupDict.Add(S, Index);
-  end
-  else
+    inherited;
+    Exit;
+  end;
+
+
+  AlreadyExisted := FLookupDict.ContainsKey(S);
+
+  inherited;
+
+
+  // If S existed already before the insert (that can happen if duplicates are allowed),
+  // then we don't need to do anything more
+  if AlreadyExisted then
+    Exit;
+
+  // Check if S got added last in the list, or somewhere inside the list
+  // (NB! Count has already been increased by the inherited InsertItem, therefore Count - 1)
+  if Index < Count - 1 then
   begin
     // S was added somewhere inside the list (not at the end)
-    // - trickier case: we need to update all shifted indexes in the dictionary
+    // - in this case, we need to update all shifted indexes in the dictionary
     for DictItem in FLookupDict do
       if DictItem.Value >= Index then  // If this item was at or "to the right" of the newly inserted one,
         FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step up.
   end;
+
+  // Add the new item to the dictionary
+  FLookupDict.Add(S, Index);
 end;
 
 procedure TFastLookupStringList.Put(Index: Integer; const S: string);
@@ -147,6 +173,12 @@ var
   OldString: string;
   IndexOfDuplicateOldString: Integer;
 begin
+  if Sorted then
+  begin
+    inherited;
+    Exit;
+  end;
+
   OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
 
   inherited;
@@ -177,7 +209,8 @@ var
 begin
   FLookupDict.Clear;
   for i := 0 to Count - 1 do
-    FLookupDict.Add(Strings[i], i);
+    if not FLookupDict.ContainsKey(Strings[i]) then
+      FLookupDict.Add(Strings[i], i);
 end;
 
 end.
