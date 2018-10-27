@@ -34,13 +34,23 @@ type
   // TFastLookupStringList - has the exact same functionality as a TStringList
   // but does fast lookups (IndexOf) even if it is not sorted.
   // It accomplishes this by using an internal dictionary.
-  // It is mostly useful for large stringlists (say, 100 items or more).
+  //
+  // It is most useful for stringlists with many items (at least 100 items
+  // or more, but most notably useful with, say, tens of thousands of items).
   // This class does its special magic only when Sorted = False.
   // When Sorted = True, it handles everything using TStringList's original methods.
   //
+  // This class will be less efficient if the individual strings are very long
+  // (say, hundreds of characters each) - then the dictionary's slow hash
+  // computation may outweigh the speed gained from using the dictionary
+  // Insights from:
+  // https://www.delphitools.info/2015/03/17/long-strings-hash-vs-sorted-vs-unsorted/
+  //
   TFastLookupStringList = class(TStringList)
   private
+    FWasSorted: Boolean;  // Whether this list had Sorted = True last time we looked at it
     FLookupDict: TDictionary<string, Integer>;
+    procedure CheckWasSorted; inline;
     procedure RebuildLookupDict;
   protected
     procedure Put(Index: Integer; const S: string); override;
@@ -78,11 +88,23 @@ begin
   inherited;
 end;
 
+procedure TFastLookupStringList.CheckWasSorted;
+begin
+  // If the list was Sorted last time we looked at it,
+  // but now isn't Sorted, then we must (re)build the whole LookupDict
+  if FWasSorted and not Sorted then
+    RebuildLookupDict;
+  FWasSorted := Sorted;
+end;
+
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
+  if Sorted then
+    FLookupDict.Clear;  // Just to save memory, not really necessary functionally
   inherited;
   if not Sorted then
     RebuildLookupDict;
+  FWasSorted := Sorted;
 end;
 
 procedure TFastLookupStringList.Clear;
@@ -96,8 +118,15 @@ var
   DictItem: TPair<string, Integer>;
 begin
   inherited;
-  if Sorted then
+  if Sorted or FWasSorted then
+  begin
+    // If FWasSorted, then the dictionary isn't in useful shape, anyway.
+    // Since this Delete procedure itself doesn't need the dictionary,
+    // we can skip rebuilding it here, and let the next operation
+    // that really needs it (such as IndexOf) rebuild it
+    FWasSorted := True;
     Exit;
+  end;
 
   // TODO: Must remove OldString from FLookupDict, similar to how it's done in Put()
   for DictItem in FLookupDict do
@@ -109,9 +138,14 @@ procedure TFastLookupStringList.Exchange(Index1, Index2: Integer);
 var
   s1, s2: string;
 begin
-  if Sorted then
+  if Sorted or FWasSorted then
   begin
     inherited;
+    // If FWasSorted, then the dictionary isn't in useful shape, anyway.
+    // Since this Exchange procedure itself doesn't need the dictionary,
+    // we can skip rebuilding it here, and let the next operation
+    // that really needs it (such as IndexOf) rebuild it
+    FWasSorted := True;
     Exit;
   end;
 
@@ -124,6 +158,10 @@ end;
 
 function TFastLookupStringList.IndexOf(const S: string): Integer;
 begin
+  // If the list was Sorted last time we looked at it,
+  // but now isn't Sorted, then we must (re)build the whole LookupDict
+  CheckWasSorted;
+
   if Sorted then
     Result := inherited
   else if not FLookupDict.TryGetValue(S, Result) then
@@ -136,17 +174,19 @@ var
   DictItem: TPair<string, Integer>;
   AlreadyExisted: Boolean;
 begin
+  // If the list was Sorted last time we looked at it,
+  // but now isn't Sorted, then we must (re)build the whole LookupDict
+  CheckWasSorted;
+
   if Sorted then
   begin
     inherited;
     Exit;
   end;
 
-
   AlreadyExisted := FLookupDict.ContainsKey(S);
 
   inherited;
-
 
   // If S existed already before the insert (that can happen if duplicates are allowed),
   // then we don't need to do anything more
@@ -173,6 +213,10 @@ var
   OldString: string;
   IndexOfDuplicateOldString: Integer;
 begin
+  // If the list was Sorted last time we looked at it,
+  // but now isn't Sorted, then we must (re)build the whole LookupDict
+  CheckWasSorted;
+
   if Sorted then
   begin
     inherited;
