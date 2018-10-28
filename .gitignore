@@ -27,3 +27,7 @@ compiled*
 *.local
 *.dcp
 __*
+*.stat
+Win32/
+Win64/
+Android/

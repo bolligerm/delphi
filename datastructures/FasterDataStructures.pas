@@ -48,10 +48,15 @@ type
   //
   TFastLookupStringList = class(TStringList)
   private
-    FWasSorted: Boolean;  // Whether this list had Sorted = True last time we looked at it
+    // Whether this list had Sorted = True last time we looked at it
+    FWasSorted: Boolean;
+    // Dictionary of all unique strings in this list, giving each string's index
+    // (or the index of one occurrence of it, if there are duplicates)
     FLookupDict: TDictionary<string, Integer>;
+
     procedure CheckWasSorted; inline;
     procedure RebuildLookupDict;
+    procedure ReflectOverwrittenItemInDict(const OldString: string);
   protected
     procedure Put(Index: Integer; const S: string); override;
     procedure InsertItem(Index: Integer; const S: string; AObject: TObject); override;
@@ -116,7 +121,10 @@ end;
 procedure TFastLookupStringList.Delete(Index: Integer);
 var
   DictItem: TPair<string, Integer>;
+  OldString: string;
+  IndexOfDuplicateOldString: Integer;
 begin
+  OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
   inherited;
   if Sorted or FWasSorted then
   begin
@@ -128,10 +136,13 @@ begin
     Exit;
   end;
 
-  // TODO: Must remove OldString from FLookupDict, similar to how it's done in Put()
+  // Shift items down
   for DictItem in FLookupDict do
     if DictItem.Value > Index then  // If this item was "to the right" of the newly inserted one,
       FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step down.
+
+  // Remove or re-point OldString in the dictionary
+  ReflectOverwrittenItemInDict(OldString);
 end;
 
 procedure TFastLookupStringList.Exchange(Index1, Index2: Integer);
@@ -188,11 +199,6 @@ begin
 
   inherited;
 
-  // If S existed already before the insert (that can happen if duplicates are allowed),
-  // then we don't need to do anything more
-  if AlreadyExisted then
-    Exit;
-
   // Check if S got added last in the list, or somewhere inside the list
   // (NB! Count has already been increased by the inherited InsertItem, therefore Count - 1)
   if Index < Count - 1 then
@@ -204,14 +210,17 @@ begin
         FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step up.
   end;
 
-  // Add the new item to the dictionary
-  FLookupDict.Add(S, Index);
+  // Add the new item to the dictionary.
+  // However, if S existed in it already before the insert (that can happen if duplicates are allowed),
+  // then we don't need to do anything more
+  if not AlreadyExisted then
+    FLookupDict.Add(S, Index);
 end;
 
 procedure TFastLookupStringList.Put(Index: Integer; const S: string);
 var
   OldString: string;
-  IndexOfDuplicateOldString: Integer;
+  AlreadyExisted: Boolean;
 begin
   // If the list was Sorted last time we looked at it,
   // but now isn't Sorted, then we must (re)build the whole LookupDict
@@ -225,26 +234,18 @@ begin
 
   OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
 
+  AlreadyExisted := FLookupDict.ContainsKey(S);
+
   inherited;
 
-  if Duplicates = dupAccept then
-  begin
-    // With duplicates allowed, there might still exist another item with the same old string
-    IndexOfDuplicateOldString := inherited IndexOf(OldString);  // Must call inherited here, even if it's slow
-    if IndexOfDuplicateOldString = -1 then
-      // The old string happened to be unique in the list. Remove it from the dictionary
-      FLookupDict.Remove(OldString)
-    else
-      // The old string exists in at least one other location in the list.
-      // Re-point the old key to there
-      FLookupDict[OldString] := IndexOfDuplicateOldString;
-  end
-  else
-    // No duplicates allowed. We can simply remove the old key
-    FLookupDict.Remove(OldString);
+  // Remove or re-point OldString in the dictionary
+  ReflectOverwrittenItemInDict(OldString);
 
-  // In all cases, add the new one
-  FLookupDict.Add(S, Index);
+  // Add the new item to the dictionary.
+  // However, if S existed in it already before the insert (that can happen if duplicates are allowed),
+  // then we don't need to do anything more
+  if not AlreadyExisted then
+    FLookupDict.AddOrSetValue(S, Index);
 end;
 
 procedure TFastLookupStringList.RebuildLookupDict;
@@ -255,6 +256,27 @@ begin
   for i := 0 to Count - 1 do
     if not FLookupDict.ContainsKey(Strings[i]) then
       FLookupDict.Add(Strings[i], i);
+end;
+
+procedure TFastLookupStringList.ReflectOverwrittenItemInDict(const OldString: string);
+var
+  IndexOfDuplicateOldString: Integer;
+begin
+  // This procedure is called from Delete and Put.
+  // It updates the dictionary to reflect the fact
+  // that an item (OldString) was overwritten.
+
+  // Remove OldString from FLookupDict, but only if it's the last occurrence of this string in the list.
+  // Since duplicates are allowed (they're always allowed in unsorted TStringLists),
+  // there might still exist another item with the same old string
+  IndexOfDuplicateOldString := inherited IndexOf(OldString);  // Must call inherited here, even if it's slow
+  if IndexOfDuplicateOldString = -1 then
+    // The old string happened to be unique in the list. Remove it from the dictionary
+    FLookupDict.Remove(OldString)
+  else
+    // The old string exists in at least one other location in the list.
+    // Re-point the old key to there
+    FLookupDict[OldString] := IndexOfDuplicateOldString;
 end;
 
 end.
