@@ -245,7 +245,7 @@ begin
   // However, if S existed in it already before the insert (that can happen if duplicates are allowed),
   // then we don't need to do anything more
   if not AlreadyExisted then
-    FLookupDict.AddOrSetValue(S, Index);
+    FLookupDict.Add(S, Index);
 end;
 
 procedure TFastLookupStringList.RebuildLookupDict;
