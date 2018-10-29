@@ -104,7 +104,7 @@ end;
 
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
-  if Sorted then
+  if (Source is TStringList) and TStringList(Source).Sorted then
     FLookupDict.Clear;  // Just to save memory, not really necessary functionally
   inherited;
   if not Sorted then
