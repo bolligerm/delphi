@@ -25,6 +25,7 @@ type
     procedure TearDown; override;
   published
     procedure TestAssign;
+    procedure TestAssignSorted;
     procedure TestClear;
     procedure TestDelete;
     procedure TestExchange;
@@ -65,6 +66,34 @@ begin
     CheckEquals(SL.Count, FFastLookupStringList.Count, 'Count differs after Assign');
     CheckEquals(SL[0], FFastLookupStringList[0], 'Item 0 differs after Assign');
     CheckEquals(SL[1], FFastLookupStringList[1], 'Item 1 differs after Assign');
+    CheckEquals(0, FFastLookupStringList.IndexOf('One'), 'IndexOf One after Assign');
+    CheckEquals(1, FFastLookupStringList.IndexOf('Two'), 'IndexOf Two after Assign');
+    CheckEquals(-1, FFastLookupStringList.IndexOf('Original First'), 'IndexOf Original First after Assign');
+    CheckEquals(-1, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf Original Third after Assign');
+  finally
+    SL.Free;
+  end;
+end;
+
+procedure TestTFastLookupStringList.TestAssignSorted;
+var
+  Source: TPersistent;
+  SL: TStringList;
+begin
+  SL := TStringList.Create;
+  try
+    SL.Sorted := True;
+    SL.Add('One');
+    SL.Add('Two');
+    Source := SL;
+    FFastLookupStringList.Assign(Source);
+    CheckEquals(SL.Count, FFastLookupStringList.Count, 'Count differs after Assign Sorted');
+    CheckEquals(SL[0], FFastLookupStringList[0], 'Item 0 differs after Assign Sorted');
+    CheckEquals(SL[1], FFastLookupStringList[1], 'Item 1 differs after Assign Sorted');
+    CheckEquals(0, FFastLookupStringList.IndexOf('One'), 'IndexOf One after Assign Sorted');
+    CheckEquals(1, FFastLookupStringList.IndexOf('Two'), 'IndexOf Two after Assign Sorted');
+    CheckEquals(-1, FFastLookupStringList.IndexOf('Original First'), 'IndexOf Original First after Assign Sorted');
+    CheckEquals(-1, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf Original Third after Assign Sorted');
   finally
     SL.Free;
   end;
