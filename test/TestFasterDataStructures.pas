@@ -169,6 +169,7 @@ begin
   CheckEquals('New Third', FFastLookupStringList[2], 'Value 2 after Put2');
   CheckEquals(-1, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf old after Put2');
   CheckTrue(FFastLookupStringList.IndexOf('New Third') in [0, 2], 'IndexOf new after Put2');  // Either 0 or 2 is fine
+  CheckEquals(0, FFastLookupStringList.IndexOf('New Third'), 'Stricter IndexOf new after Put2');  // Only 0 is fine for full TStringList compatibility
   CheckEquals(5, FFastLookupStringList.Count, 'Count after Put2');
 end;
 

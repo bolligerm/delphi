@@ -46,6 +46,12 @@ type
   // Insights from:
   // https://www.delphitools.info/2015/03/17/long-strings-hash-vs-sorted-vs-unsorted/
   //
+  // TODO: Known issues:
+  // - IndexOf should return the _first_ occurrence (so says the TStringList documentation),
+  //   currently returns _some_ occurrence.
+  // - CaseSensitive = False should be supported (currently IndexOf disregards it)
+  // - Changing/Changed correct support (using UpdateCount internally)
+  //
   TFastLookupStringList = class(TStringList)
   private
     // Whether this list had Sorted = True last time we looked at it
