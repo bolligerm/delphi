@@ -32,6 +32,7 @@ type
     procedure TestIndexOf;
     procedure TestPut;
     procedure TestInsert;
+    procedure TestCaseInsensitive;
   end;
 
 implementation
@@ -61,10 +62,15 @@ begin
   try
     SL.Add('One');
     SL.Add('Two');
+    SL.Add('Three');
+    SL.Add('One');  // Repeat One
+    SL.Add('Five');
+    SL.Add('Six');
+    SL.Add('Seven');
     Source := SL;
     FFastLookupStringList.Assign(Source);
     CheckEquals(SL.Count, FFastLookupStringList.Count, 'Count differs after Assign');
-    CheckEquals(SL[0], FFastLookupStringList[0], 'Item 0 differs after Assign');
+    CheckEquals(SL[0], FFastLookupStringList[0], 'Item 0 differs after Assign');  // Must be 0, not 3
     CheckEquals(SL[1], FFastLookupStringList[1], 'Item 1 differs after Assign');
     CheckEquals(0, FFastLookupStringList.IndexOf('One'), 'IndexOf One after Assign');
     CheckEquals(1, FFastLookupStringList.IndexOf('Two'), 'IndexOf Two after Assign');
@@ -99,6 +105,16 @@ begin
   end;
 end;
 
+procedure TestTFastLookupStringList.TestCaseInsensitive;
+begin
+  FFastLookupStringList.CaseSensitive := False;
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-insensitive list, a');
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-insensitive list, b');
+  FFastLookupStringList.CaseSensitive := True;
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-sensitive list, a');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-sensitive list, b');
+end;
+
 procedure TestTFastLookupStringList.TestClear;
 begin
   FFastLookupStringList.Clear;
@@ -121,19 +137,21 @@ begin
 end;
 
 procedure TestTFastLookupStringList.TestExchange;
-var
-  Index2: Integer;
-  Index1: Integer;
 begin
-  Index1 := 0;
-  Index2 := 2;
-  FFastLookupStringList.Exchange(Index1, Index2);
+  FFastLookupStringList.Exchange(0, 2);
   CheckEquals('Original First', FFastLookupStringList[2], 'Contents after Exchange');
   CheckEquals('Original Third', FFastLookupStringList[0], 'Contents after Exchange');
   // IndexOf tests
-  CheckEquals(0, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf after Delete');
-  CheckEquals(2, FFastLookupStringList.IndexOf('Original First'), 'IndexOf after Delete');
-  CheckEquals(3, FFastLookupStringList.IndexOf('Original Fourth'), 'IndexOf after Delete');
+  CheckEquals(0, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf after Exchange');
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original First'), 'IndexOf after Exchange');
+  CheckEquals(3, FFastLookupStringList.IndexOf('Original Fourth'), 'IndexOf after Exchange');
+  // Some more tests, with duplicates
+  FFastLookupStringList.Add('Original Second');
+  CheckEquals(1, FFastLookupStringList.IndexOf('Original Second'), 'IndexOf after Exchange with duplicates, a');
+  FFastLookupStringList.Exchange(0, 5);
+  CheckEquals(0, FFastLookupStringList.IndexOf('Original Second'), 'IndexOf after Exchange with duplicates, b');
+  FFastLookupStringList.Exchange(0, 5);
+  CheckEquals(1, FFastLookupStringList.IndexOf('Original Second'), 'IndexOf after Exchange with duplicates, c');  // Must be 1, not 5
 end;
 
 procedure TestTFastLookupStringList.TestIndexOf;
@@ -143,13 +161,17 @@ var
 begin
   S := 'Not to be found';
   ReturnValue := FFastLookupStringList.IndexOf(S);
-  CheckEquals(ReturnValue, -1);
+  CheckEquals(-1, ReturnValue, 'IndexOf Not to be found');
   S := 'Original Third';
   ReturnValue := FFastLookupStringList.IndexOf(S);
-  CheckEquals(ReturnValue, 2);
+  CheckEquals(2, ReturnValue, 'IndexOf Original Third');
   S := 'Original third';  // Differs in case
   ReturnValue := FFastLookupStringList.IndexOf(S);
-  CheckEquals(ReturnValue, -1);
+  CheckEquals(2, ReturnValue, 'IndexOf Original third');
+  // Change to case sensitive
+  FFastLookupStringList.CaseSensitive := True;
+  ReturnValue := FFastLookupStringList.IndexOf(S);
+  CheckEquals(-1, ReturnValue, 'IndexOf Original third (CaseSensitive)');
 end;
 
 procedure TestTFastLookupStringList.TestPut;
@@ -169,6 +191,7 @@ begin
   CheckEquals('New Third', FFastLookupStringList[2], 'Value 2 after Put2');
   CheckEquals(-1, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf old after Put2');
   CheckTrue(FFastLookupStringList.IndexOf('New Third') in [0, 2], 'IndexOf new after Put2');  // Either 0 or 2 is fine
+  CheckEquals(0, FFastLookupStringList.IndexOf('New Third'), 'Stricter IndexOf new after Put2');  // Only 0 is fine for full TStringList compatibility
   CheckEquals(5, FFastLookupStringList.Count, 'Count after Put2');
 end;
 
