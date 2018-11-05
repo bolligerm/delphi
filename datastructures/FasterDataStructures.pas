@@ -47,11 +47,12 @@ type
   // https://www.delphitools.info/2015/03/17/long-strings-hash-vs-sorted-vs-unsorted/
   //
   // TODO: Known issues:
-  // - CaseSensitive = False should be supported (currently IndexOf disregards it)
   // - Changing/Changed correct support (using UpdateCount internally)
   //
   TFastLookupStringList = class(TStringList)
   private
+    // Whether this list had CaseSensitive = True last time we looked at it
+    FWasCaseSensitive: Boolean;
     // Whether this list had Sorted = True last time we looked at it
     FWasSorted: Boolean;
     // Dictionary of all unique strings in this list, giving each string's index
@@ -59,7 +60,8 @@ type
     // Used only when Sorted = False
     FLookupDict: TDictionary<string, Integer>;
 
-    procedure CheckWasSorted; inline;
+    procedure CheckForChangedCaseSensitiveOrSorted; inline;
+    procedure RecreateLookupDict;
     procedure RebuildLookupDict;
     procedure ReflectOverwrittenItemInDict(const OldString: string);
     procedure ReflectInsertedItemInDict(Index: Integer; const S: string;
@@ -80,18 +82,21 @@ type
 
 implementation
 
+uses
+  System.Generics.Defaults;
+
 { TFastLookupStringList }
 
 constructor TFastLookupStringList.Create;
 begin
   inherited Create;
-  FLookupDict := TDictionary<string, Integer>.Create;
+  RecreateLookupDict;
 end;
 
 constructor TFastLookupStringList.Create(OwnsObjects: Boolean);
 begin
   inherited Create(OwnsObjects);
-  FLookupDict := TDictionary<string, Integer>.Create;
+  RecreateLookupDict;
 end;
 
 destructor TFastLookupStringList.Destroy;
@@ -100,23 +105,34 @@ begin
   inherited;
 end;
 
-procedure TFastLookupStringList.CheckWasSorted;
+procedure TFastLookupStringList.CheckForChangedCaseSensitiveOrSorted;
 begin
+  // If the list's CaseSensitive property has changed since last time we looked at it,
+  // then we must recreate the whole LookupDict
+  // (using the appropriate StringComparer)
+  if FWasCaseSensitive <> CaseSensitive then
+    RecreateLookupDict;
+
   // If the list was Sorted last time we looked at it,
   // but now isn't Sorted, then we must (re)build the whole LookupDict
-  if FWasSorted and not Sorted then
+  if (FWasSorted and not Sorted) or (FWasCaseSensitive <> CaseSensitive) then
     RebuildLookupDict;
+
+  FWasCaseSensitive := CaseSensitive;
   FWasSorted := Sorted;
 end;
 
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
+  if (Source is TStringList) and (TStringList(Source).CaseSensitive <> CaseSensitive) then
+    RecreateLookupDict;
   if (Source is TStringList) and TStringList(Source).Sorted then
     FLookupDict.Clear;  // Just to save memory, not really necessary functionally
   inherited;
   if not Sorted then
     RebuildLookupDict;
   FWasSorted := Sorted;
+  FWasCaseSensitive := CaseSensitive;
 end;
 
 procedure TFastLookupStringList.Clear;
@@ -198,9 +214,9 @@ end;
 
 function TFastLookupStringList.IndexOf(const S: string): Integer;
 begin
-  // If the list was Sorted last time we looked at it,
-  // but now isn't Sorted, then we must (re)build the whole LookupDict
-  CheckWasSorted;
+  // If the list's CaseSensitive or Sorted properties have changed since last time we looked at it,
+  // then we must recreate and/or (re)build the whole LookupDict
+  CheckForChangedCaseSensitiveOrSorted;
 
   if Sorted then
     Result := inherited
@@ -214,9 +230,9 @@ var
   DictItem: TPair<string, Integer>;
   AlreadyExisted: Boolean;
 begin
-  // If the list was Sorted last time we looked at it,
-  // but now isn't Sorted, then we must (re)build the whole LookupDict
-  CheckWasSorted;
+  // If the list's CaseSensitive or Sorted properties have changed since last time we looked at it,
+  // then we must recreate and/or (re)build the whole LookupDict
+  CheckForChangedCaseSensitiveOrSorted;
 
   if Sorted then
   begin
@@ -251,9 +267,9 @@ var
   OldString: string;
   AlreadyExisted: Boolean;
 begin
-  // If the list was Sorted last time we looked at it,
-  // but now isn't Sorted, then we must (re)build the whole LookupDict
-  CheckWasSorted;
+  // If the list's CaseSensitive or Sorted properties have changed since last time we looked at it,
+  // then we must recreate and/or (re)build the whole LookupDict
+  CheckForChangedCaseSensitiveOrSorted;
 
   if Sorted then
   begin
@@ -275,6 +291,17 @@ begin
   // then we need to check which one of the strings is the first, the existing one or the new one,
   // and make sure that the dictionary points to the first one of these (i.e. the one with the smallest index)
   ReflectInsertedItemInDict(Index, S, AlreadyExisted);
+end;
+
+procedure TFastLookupStringList.RecreateLookupDict;
+begin
+  FLookupDict.Free;
+  if CaseSensitive then
+    // The default dictionary is case-sensitive
+    FLookupDict := TDictionary<string, Integer>.Create
+  else
+    // TIStringComparer.Ordinal makes it case-insensitive
+    FLookupDict := TDictionary<string, Integer>.Create(TIStringComparer.Ordinal);
 end;
 
 procedure TFastLookupStringList.RebuildLookupDict;

@@ -32,6 +32,7 @@ type
     procedure TestIndexOf;
     procedure TestPut;
     procedure TestInsert;
+    procedure TestCaseInsensitive;
   end;
 
 implementation
@@ -104,6 +105,16 @@ begin
   end;
 end;
 
+procedure TestTFastLookupStringList.TestCaseInsensitive;
+begin
+  FFastLookupStringList.CaseSensitive := False;
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-insensitive list, a');
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-insensitive list, b');
+  FFastLookupStringList.CaseSensitive := True;
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-sensitive list, a');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-sensitive list, b');
+end;
+
 procedure TestTFastLookupStringList.TestClear;
 begin
   FFastLookupStringList.Clear;
@@ -150,13 +161,17 @@ var
 begin
   S := 'Not to be found';
   ReturnValue := FFastLookupStringList.IndexOf(S);
-  CheckEquals(ReturnValue, -1);
+  CheckEquals(-1, ReturnValue, 'IndexOf Not to be found');
   S := 'Original Third';
   ReturnValue := FFastLookupStringList.IndexOf(S);
-  CheckEquals(ReturnValue, 2);
+  CheckEquals(2, ReturnValue, 'IndexOf Original Third');
   S := 'Original third';  // Differs in case
   ReturnValue := FFastLookupStringList.IndexOf(S);
-  CheckEquals(ReturnValue, -1);
+  CheckEquals(2, ReturnValue, 'IndexOf Original third');
+  // Change to case sensitive
+  FFastLookupStringList.CaseSensitive := True;
+  ReturnValue := FFastLookupStringList.IndexOf(S);
+  CheckEquals(-1, ReturnValue, 'IndexOf Original third (CaseSensitive)');
 end;
 
 procedure TestTFastLookupStringList.TestPut;
