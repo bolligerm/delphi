@@ -107,12 +107,32 @@ end;
 
 procedure TestTFastLookupStringList.TestCaseInsensitive;
 begin
+  // Add a string with letters outside a-z (to make UseLocale matter)
+  FFastLookupStringList.Add('Õuna süda');
+
+  // Here UseLocale = True (the default)
   FFastLookupStringList.CaseSensitive := False;
   CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-insensitive list, a');
   CheckEquals(2, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-insensitive list, b');
+  CheckEquals(5, FFastLookupStringList.IndexOf('Õuna süda'), 'IndexOf in case-insensitive list, c');
+  CheckEquals(5, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in case-insensitive list, d');  // INTERESTING DIFFERENCE
   FFastLookupStringList.CaseSensitive := True;
   CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-sensitive list, a');
   CheckEquals(-1, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-sensitive list, b');
+  CheckEquals(5, FFastLookupStringList.IndexOf('Õuna süda'), 'IndexOf in case-sensitive list, c');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in case-sensitive list, d');
+
+  // Now we set UseLocale = False
+  FFastLookupStringList.UseLocale := False;
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in non-locale case-sensitive list, a');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in non-locale case-sensitive list, b');
+  CheckEquals(5, FFastLookupStringList.IndexOf('Õuna süda'), 'IndexOf in non-locale case-sensitive list, c');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in non-locale case-sensitive list, d');
+  FFastLookupStringList.CaseSensitive := False;
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in non-locale case-insensitive list, a');
+  CheckEquals(2, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in non-locale case-insensitive list, b');
+  CheckEquals(5, FFastLookupStringList.IndexOf('Õuna süda'), 'IndexOf in non-locale case-insensitive list, c');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
 end;
 
 procedure TestTFastLookupStringList.TestClear;

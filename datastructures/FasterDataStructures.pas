@@ -48,6 +48,7 @@ type
   //
   // TODO: Known issues:
   // - Changing/Changed correct support (using UpdateCount internally)
+  // - Add all TStringList constructors
   //
   TFastLookupStringList = class(TStringList)
   private
@@ -61,6 +62,7 @@ type
     FLookupDict: TDictionary<string, Integer>;
 
     procedure CheckForChangedCaseSensitiveOrSorted; inline;
+    function Dictify(const s: string): string; inline;
     procedure RecreateLookupDict;
     procedure RebuildLookupDict;
     procedure ReflectOverwrittenItemInDict(const OldString: string);
@@ -83,7 +85,7 @@ type
 implementation
 
 uses
-  System.Generics.Defaults;
+  System.SysUtils, System.Generics.Defaults;  // Not used now: LocaleAwareStringComparers;
 
 { TFastLookupStringList }
 
@@ -103,6 +105,28 @@ destructor TFastLookupStringList.Destroy;
 begin
   FLookupDict.Free;
   inherited;
+end;
+
+function TFastLookupStringList.Dictify(const s: string): string;
+begin
+  // It may seem like it could be bad for performance
+  // to call AnsiLowerCase (via Dictify here) every time the dictionary is accessed.
+  // However, the alternative would be to let the dictionary be created with
+  // TDictionary<string, Integer>.Create(TIStringComparer.Ordinal),
+  // and that comparer would call AnsiLowerCase even more times:
+  // twice in its Compare and Equals methods and once in its GetHashCode method
+  // (see System.Generics.Defaults).
+  // TDictionary.GetItem calls GetHashCode once and Equals at least once (sometimes multiple times),
+  // so in total, we would end up calling AnsiLowerCase more times (possibly many more).
+  //
+  // Plus, by using our own Dictify, we can properly support the non-UseLocale case, too.
+
+  if CaseSensitive then
+    Result := s
+  else if UseLocale then
+    Result := AnsiLowerCase(s)
+  else
+    Result := LowerCase(s);
 end;
 
 procedure TFastLookupStringList.CheckForChangedCaseSensitiveOrSorted;
@@ -202,13 +226,13 @@ begin
   // using the inherited (slow) IndexOf, and updated the dictionary accordingly
   if Index2 > Index1 then
   begin
-    FLookupDict[s1] := Min(Index2, inherited IndexOf(s1));
-    FLookupDict[s2] := Index1;
+    FLookupDict[Dictify(s1)] := Min(Index2, inherited IndexOf(s1));
+    FLookupDict[Dictify(s2)] := Index1;
   end
   else
   begin
-    FLookupDict[s1] := Index2;
-    FLookupDict[s2] := Min(Index1, inherited IndexOf(s2));
+    FLookupDict[Dictify(s1)] := Index2;
+    FLookupDict[Dictify(s2)] := Min(Index1, inherited IndexOf(s2));
   end;
 end;
 
@@ -220,7 +244,7 @@ begin
 
   if Sorted then
     Result := inherited
-  else if not FLookupDict.TryGetValue(S, Result) then
+  else if not FLookupDict.TryGetValue(Dictify(S), Result) then
     Result := -1;
 end;
 
@@ -240,7 +264,7 @@ begin
     Exit;
   end;
 
-  AlreadyExisted := FLookupDict.ContainsKey(S);
+  AlreadyExisted := FLookupDict.ContainsKey(Dictify(S));
 
   inherited;
 
@@ -279,7 +303,7 @@ begin
 
   OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
 
-  AlreadyExisted := FLookupDict.ContainsKey(S);
+  AlreadyExisted := FLookupDict.ContainsKey(Dictify(S));
 
   inherited;
 
@@ -295,13 +319,30 @@ end;
 
 procedure TFastLookupStringList.RecreateLookupDict;
 begin
+  // This recreation is no longer needed,
+  // since we added Dictify().
+  // Now we just create the dict here, just once,
+  // and never really recreate it any more.
+  if FLookupDict = nil then
+    FLookupDict := TDictionary<string, Integer>.Create;
+
+(*
   FLookupDict.Free;
+
+  // An other option would have been:
+  // FLookupDict := TDictionary<string, Integer>.Create(GetStringComparer(UseLocale, CaseSensitive));
+  // using unit LocaleAwareStringComparers
+
+  // The following, third option works OK with regard to CaseSensitive,
+  // but does not honor UseLocale
+  // (it will always work as if UseLocale = True):
   if CaseSensitive then
     // The default dictionary is case-sensitive
     FLookupDict := TDictionary<string, Integer>.Create
   else
     // TIStringComparer.Ordinal makes it case-insensitive
     FLookupDict := TDictionary<string, Integer>.Create(TIStringComparer.Ordinal);
+*)
 end;
 
 procedure TFastLookupStringList.RebuildLookupDict;
@@ -310,8 +351,8 @@ var
 begin
   FLookupDict.Clear;
   for i := 0 to Count - 1 do
-    if not FLookupDict.ContainsKey(Strings[i]) then
-      FLookupDict.Add(Strings[i], i);
+    if not FLookupDict.ContainsKey(Dictify(Strings[i])) then
+      FLookupDict.Add(Dictify(Strings[i]), i);
 end;
 
 procedure TFastLookupStringList.ReflectInsertedItemInDict(
@@ -329,12 +370,12 @@ begin
   // then we need to check which one of the strings is the first, the existing one or the new one,
   // and make sure that the dictionary points to the first one of these (i.e. the one with the smallest index)
   if not AlreadyExisted then
-    FLookupDict.Add(S, Index)
+    FLookupDict.Add(Dictify(S), Index)
   else
   begin
-    IndexOfExisting := FLookupDict[S];
+    IndexOfExisting := FLookupDict[Dictify(S)];
     if Index < IndexOfExisting  then
-      FLookupDict[S] := Index;
+      FLookupDict[Dictify(S)] := Index;
   end;
 end;
 
@@ -352,11 +393,11 @@ begin
   IndexOfDuplicateOldString := inherited IndexOf(OldString);  // Must call inherited here, even if it's slow
   if IndexOfDuplicateOldString = -1 then
     // The old string happened to be unique in the list. Remove it from the dictionary
-    FLookupDict.Remove(OldString)
+    FLookupDict.Remove(Dictify(OldString))
   else
     // The old string exists in at least one other location in the list.
     // Re-point the old key to there
-    FLookupDict[OldString] := IndexOfDuplicateOldString;
+    FLookupDict[Dictify(OldString)] := IndexOfDuplicateOldString;
 end;
 
 end.
