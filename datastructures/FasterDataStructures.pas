@@ -47,12 +47,14 @@ type
   // https://www.delphitools.info/2015/03/17/long-strings-hash-vs-sorted-vs-unsorted/
   //
   // TODO: Known issues:
-  // - Rebuild dict upon changed UseLocale option
+  // - Clean up code that is not needed in RecreateLookupDict
   //
   TFastLookupStringList = class(TStringList)
   private
     // Whether this list had CaseSensitive = True last time we looked at it
     FWasCaseSensitive: Boolean;
+    // Whether this list had UseLocale = True last time we looked at it
+    FWasUseLocale: Boolean;
     // Whether this list had Sorted = True last time we looked at it
     FWasSorted: Boolean;
     // Dictionary of all unique strings in this list, giving each string's index
@@ -153,25 +155,36 @@ end;
 
 procedure TFastLookupStringList.CheckForChangedCaseSensitiveOrSorted;
 begin
-  // If the list's CaseSensitive property has changed since last time we looked at it,
+(*
+  // The following recreation is no longer needed,
+  // since we added Dictify():
+
+  // If the list's CaseSensitive or UseLocale property has changed since last time we looked at it,
   // then we must recreate the whole LookupDict
   // (using the appropriate StringComparer)
-  if FWasCaseSensitive <> CaseSensitive then
+  if (FWasCaseSensitive <> CaseSensitive) or (FWasUseLocale <> UseLocale) then
     RecreateLookupDict;
+*)
 
-  // If the list was Sorted last time we looked at it,
-  // but now isn't Sorted, then we must (re)build the whole LookupDict
-  if (FWasSorted and not Sorted) or (FWasCaseSensitive <> CaseSensitive) then
+  // If we are non-Sorted, then we need the dictionary.
+  // The dictionary needs a full rebuild if
+  // the list was Sorted last time we looked at it (but now isn't),
+  // or CaseSensitive or UseLocale has changed.
+  if (not Sorted) and
+     (FWasSorted or (FWasCaseSensitive <> CaseSensitive) or (FWasUseLocale <> UseLocale)) then
     RebuildLookupDict;
 
   FWasCaseSensitive := CaseSensitive;
+  FWasUseLocale := UseLocale;
   FWasSorted := Sorted;
 end;
 
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
   BeginUpdate;
-  if (Source is TStringList) and (TStringList(Source).CaseSensitive <> CaseSensitive) then
+  if (Source is TStringList) and
+     ((TStringList(Source).CaseSensitive <> CaseSensitive) or
+      (TStringList(Source).UseLocale <> UseLocale)) then
     RecreateLookupDict;
   if (Source is TStringList) and TStringList(Source).Sorted then
     FLookupDict.Clear;  // Just to save memory, not really necessary functionally
@@ -180,6 +193,7 @@ begin
     RebuildLookupDict;
   FWasSorted := Sorted;
   FWasCaseSensitive := CaseSensitive;
+  FWasUseLocale := UseLocale;
   EndUpdate;
 end;
 
