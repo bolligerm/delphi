@@ -133,6 +133,13 @@ begin
   CheckEquals(2, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in non-locale case-insensitive list, b');
   CheckEquals(5, FFastLookupStringList.IndexOf('Õuna süda'), 'IndexOf in non-locale case-insensitive list, c');
   CheckEquals(-1, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
+
+  // Set UseLocale = True again
+  FFastLookupStringList.UseLocale := True;
+  CheckEquals(5, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in again-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
+  // Set UseLocale = False again
+  FFastLookupStringList.UseLocale := False;
+  CheckEquals(-1, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in again-non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
 end;
 
 procedure TestTFastLookupStringList.TestClear;
