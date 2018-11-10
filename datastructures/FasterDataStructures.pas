@@ -47,7 +47,7 @@ type
   // https://www.delphitools.info/2015/03/17/long-strings-hash-vs-sorted-vs-unsorted/
   //
   // TODO: Known issues:
-  // - Changing/Changed correct support (using UpdateCount internally)
+  // - Rebuild dict upon changed UseLocale option
   //
   TFastLookupStringList = class(TStringList)
   private
@@ -170,6 +170,7 @@ end;
 
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
+  BeginUpdate;
   if (Source is TStringList) and (TStringList(Source).CaseSensitive <> CaseSensitive) then
     RecreateLookupDict;
   if (Source is TStringList) and TStringList(Source).Sorted then
@@ -179,12 +180,15 @@ begin
     RebuildLookupDict;
   FWasSorted := Sorted;
   FWasCaseSensitive := CaseSensitive;
+  EndUpdate;
 end;
 
 procedure TFastLookupStringList.Clear;
 begin
+  BeginUpdate;
   inherited;
   FLookupDict.Clear;
+  EndUpdate;
 end;
 
 procedure TFastLookupStringList.Delete(Index: Integer);
@@ -192,6 +196,7 @@ var
   DictItem: TPair<string, Integer>;
   OldString: string;
 begin
+  BeginUpdate;
   OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
   inherited;
   if Sorted or FWasSorted then
@@ -201,16 +206,18 @@ begin
     // we can skip rebuilding it here, and let the next operation
     // that really needs it (such as IndexOf) rebuild it
     FWasSorted := True;
-    Exit;
+  end
+  else
+  begin
+    // Shift items down
+    for DictItem in FLookupDict do
+      if DictItem.Value > Index then  // If this item was "to the right" of the deleted one,
+        FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step down.
+
+    // Remove or re-point OldString in the dictionary
+    ReflectOverwrittenItemInDict(OldString);
   end;
-
-  // Shift items down
-  for DictItem in FLookupDict do
-    if DictItem.Value > Index then  // If this item was "to the right" of the deleted one,
-      FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step down.
-
-  // Remove or re-point OldString in the dictionary
-  ReflectOverwrittenItemInDict(OldString);
+  EndUpdate;
 end;
 
 procedure TFastLookupStringList.Exchange(Index1, Index2: Integer);
@@ -226,6 +233,7 @@ var
   end;
 
 begin
+  BeginUpdate;
   if Sorted or FWasSorted then
   begin
     inherited;
@@ -234,28 +242,30 @@ begin
     // we can skip rebuilding it here, and let the next operation
     // that really needs it (such as IndexOf) rebuild it
     FWasSorted := True;
-    Exit;
-  end;
-
-  s1 := Strings[Index1];
-  s2 := Strings[Index2];
-
-  inherited;
-
-  // The string that has moved "up" (i.e. is now at the larger index)
-  // may have jumped past another occurence of the same string,
-  // and that one is now the first occurrence. Must check for this
-  // using the inherited (slow) IndexOf, and updated the dictionary accordingly
-  if Index2 > Index1 then
-  begin
-    FLookupDict[Dictify(s1)] := Min(Index2, inherited IndexOf(s1));
-    FLookupDict[Dictify(s2)] := Index1;
   end
   else
   begin
-    FLookupDict[Dictify(s1)] := Index2;
-    FLookupDict[Dictify(s2)] := Min(Index1, inherited IndexOf(s2));
+    s1 := Strings[Index1];
+    s2 := Strings[Index2];
+
+    inherited;
+
+    // The string that has moved "up" (i.e. is now at the larger index)
+    // may have jumped past another occurence of the same string,
+    // and that one is now the first occurrence. Must check for this
+    // using the inherited (slow) IndexOf, and updated the dictionary accordingly
+    if Index2 > Index1 then
+    begin
+      FLookupDict[Dictify(s1)] := Min(Index2, inherited IndexOf(s1));
+      FLookupDict[Dictify(s2)] := Index1;
+    end
+    else
+    begin
+      FLookupDict[Dictify(s1)] := Index2;
+      FLookupDict[Dictify(s2)] := Min(Index1, inherited IndexOf(s2));
+    end;
   end;
+  EndUpdate;
 end;
 
 function TFastLookupStringList.IndexOf(const S: string): Integer;
@@ -276,6 +286,8 @@ var
   DictItem: TPair<string, Integer>;
   AlreadyExisted: Boolean;
 begin
+  BeginUpdate;
+
   // If the list's CaseSensitive or Sorted properties have changed since last time we looked at it,
   // then we must recreate and/or (re)build the whole LookupDict
   CheckForChangedCaseSensitiveOrSorted;
@@ -283,29 +295,31 @@ begin
   if Sorted then
   begin
     inherited;
-    Exit;
-  end;
-
-  AlreadyExisted := FLookupDict.ContainsKey(Dictify(S));
-
-  inherited;
-
-  // Check if S got added last in the list, or somewhere inside the list
-  // (NB! Count has already been increased by the inherited InsertItem, therefore Count - 1)
-  if Index < Count - 1 then
+  end
+  else
   begin
-    // S was added somewhere inside the list (not at the end)
-    // - in this case, we need to update all shifted indexes in the dictionary
-    for DictItem in FLookupDict do
-      if DictItem.Value >= Index then  // If this item was at or "to the right" of the newly inserted one,
-        FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step up.
+    AlreadyExisted := FLookupDict.ContainsKey(Dictify(S));
+    inherited;
+
+    // Check if S got added last in the list, or somewhere inside the list
+    // (NB! Count has already been increased by the inherited InsertItem, therefore Count - 1)
+    if Index < Count - 1 then
+    begin
+      // S was added somewhere inside the list (not at the end)
+      // - in this case, we need to update all shifted indexes in the dictionary
+      for DictItem in FLookupDict do
+        if DictItem.Value >= Index then  // If this item was at or "to the right" of the newly inserted one,
+          FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step up.
+    end;
+
+    // Add the new item to the dictionary.
+    // However, if S existed in it already before the insert (that can happen if duplicates are allowed),
+    // then we need to check which one of the strings is the first, the existing one or the new one,
+    // and make sure that the dictionary points to the first one of these (i.e. the one with the smallest index)
+    ReflectInsertedItemInDict(Index, S, AlreadyExisted);
   end;
 
-  // Add the new item to the dictionary.
-  // However, if S existed in it already before the insert (that can happen if duplicates are allowed),
-  // then we need to check which one of the strings is the first, the existing one or the new one,
-  // and make sure that the dictionary points to the first one of these (i.e. the one with the smallest index)
-  ReflectInsertedItemInDict(Index, S, AlreadyExisted);
+  EndUpdate;
 end;
 
 procedure TFastLookupStringList.Put(Index: Integer; const S: string);
@@ -313,6 +327,8 @@ var
   OldString: string;
   AlreadyExisted: Boolean;
 begin
+  BeginUpdate;
+
   // If the list's CaseSensitive or Sorted properties have changed since last time we looked at it,
   // then we must recreate and/or (re)build the whole LookupDict
   CheckForChangedCaseSensitiveOrSorted;
@@ -320,23 +336,26 @@ begin
   if Sorted then
   begin
     inherited;
-    Exit;
+  end
+  else
+  begin
+    OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
+
+    AlreadyExisted := FLookupDict.ContainsKey(Dictify(S));
+
+    inherited;
+
+    // Remove or re-point OldString in the dictionary
+    ReflectOverwrittenItemInDict(OldString);
+
+    // Add the new item to the dictionary.
+    // However, if S existed in it already before the insert (that can happen if duplicates are allowed),
+    // then we need to check which one of the strings is the first, the existing one or the new one,
+    // and make sure that the dictionary points to the first one of these (i.e. the one with the smallest index)
+    ReflectInsertedItemInDict(Index, S, AlreadyExisted);
   end;
 
-  OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
-
-  AlreadyExisted := FLookupDict.ContainsKey(Dictify(S));
-
-  inherited;
-
-  // Remove or re-point OldString in the dictionary
-  ReflectOverwrittenItemInDict(OldString);
-
-  // Add the new item to the dictionary.
-  // However, if S existed in it already before the insert (that can happen if duplicates are allowed),
-  // then we need to check which one of the strings is the first, the existing one or the new one,
-  // and make sure that the dictionary points to the first one of these (i.e. the one with the smallest index)
-  ReflectInsertedItemInDict(Index, S, AlreadyExisted);
+  EndUpdate;
 end;
 
 procedure TFastLookupStringList.RecreateLookupDict;
