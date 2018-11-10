@@ -48,7 +48,6 @@ type
   //
   // TODO: Known issues:
   // - Changing/Changed correct support (using UpdateCount internally)
-  // - Add all TStringList constructors
   //
   TFastLookupStringList = class(TStringList)
   private
@@ -74,6 +73,9 @@ type
   public
     constructor Create; overload;
     constructor Create(OwnsObjects: Boolean); overload;
+    constructor Create(QuoteChar, Delimiter: Char); overload;
+    constructor Create(QuoteChar, Delimiter: Char; Options: TStringsOptions); overload;
+    constructor Create(Duplicates: TDuplicates; Sorted: Boolean; CaseSensitive: Boolean); overload;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
     procedure Clear; override;
@@ -91,13 +93,33 @@ uses
 
 constructor TFastLookupStringList.Create;
 begin
-  inherited Create;
+  inherited;
   RecreateLookupDict;
 end;
 
 constructor TFastLookupStringList.Create(OwnsObjects: Boolean);
 begin
-  inherited Create(OwnsObjects);
+  inherited;
+  RecreateLookupDict;
+end;
+
+constructor TFastLookupStringList.Create(QuoteChar, Delimiter: Char);
+begin
+  inherited;
+  RecreateLookupDict;
+end;
+
+constructor TFastLookupStringList.Create(QuoteChar, Delimiter: Char;
+  Options: TStringsOptions);
+begin
+  inherited;
+  RecreateLookupDict;
+end;
+
+constructor TFastLookupStringList.Create(Duplicates: TDuplicates; Sorted,
+  CaseSensitive: Boolean);
+begin
+  inherited;
   RecreateLookupDict;
 end;
 
