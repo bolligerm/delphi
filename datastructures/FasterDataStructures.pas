@@ -50,6 +50,14 @@ type
   // - Clean up code that is not needed in RecreateLookupDict
   //
   TFastLookupStringList = class(TStringList)
+  {$IF RTLVersion < 32.0}
+  private
+  // In versions before Delphi Tokyo, TStrings did not have a UseLocale property,
+  // and TStringList handled all strings according to the locale,
+  // i.e. in the way Delphi Tokyo and up handle them when UseLocale = True
+  const
+    UseLocale = True;
+  {$IFEND}
   private
     // Whether this list had CaseSensitive = True last time we looked at it
     FWasCaseSensitive: Boolean;
@@ -75,9 +83,12 @@ type
   public
     constructor Create; overload;
     constructor Create(OwnsObjects: Boolean); overload;
+{$IF RTLVersion >= 32.0}
+    // Additional constructors, available only in Delphi Tokyo and up
     constructor Create(QuoteChar, Delimiter: Char); overload;
     constructor Create(QuoteChar, Delimiter: Char; Options: TStringsOptions); overload;
     constructor Create(Duplicates: TDuplicates; Sorted: Boolean; CaseSensitive: Boolean); overload;
+{$IFEND}
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
     procedure Clear; override;
@@ -105,6 +116,7 @@ begin
   RecreateLookupDict;
 end;
 
+{$IF RTLVersion >= 32.0}
 constructor TFastLookupStringList.Create(QuoteChar, Delimiter: Char);
 begin
   inherited;
@@ -124,6 +136,7 @@ begin
   inherited;
   RecreateLookupDict;
 end;
+{$IFEND}
 
 destructor TFastLookupStringList.Destroy;
 begin
@@ -182,9 +195,11 @@ end;
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
   BeginUpdate;
-  if (Source is TStringList) and
-     ((TStringList(Source).CaseSensitive <> CaseSensitive) or
-      (TStringList(Source).UseLocale <> UseLocale)) then
+  if (Source is TStringList) and (
+  {$IF RTLVersion >= 32.0}
+      (TStringList(Source).UseLocale <> UseLocale) or
+  {$IFEND}
+      (TStringList(Source).CaseSensitive <> CaseSensitive)) then
     RecreateLookupDict;
   if (Source is TStringList) and TStringList(Source).Sorted then
     FLookupDict.Clear;  // Just to save memory, not really necessary functionally
