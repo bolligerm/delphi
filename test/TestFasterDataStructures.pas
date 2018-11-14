@@ -123,6 +123,7 @@ begin
   CheckEquals(-1, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in case-sensitive list, d');
 
   // Now we set UseLocale = False
+{$IF RTLVersion >= 32.0}
   FFastLookupStringList.UseLocale := False;
   CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in non-locale case-sensitive list, a');
   CheckEquals(-1, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in non-locale case-sensitive list, b');
@@ -140,6 +141,7 @@ begin
   // Set UseLocale = False again
   FFastLookupStringList.UseLocale := False;
   CheckEquals(-1, FFastLookupStringList.IndexOf('õuNA SÜda'), 'IndexOf in again-non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
+{$IFEND}
 end;
 
 procedure TestTFastLookupStringList.TestClear;
