@@ -2,11 +2,9 @@
 
 Delphi utilities
 
-This is a collection of various Delphi utilities.
+This is a collection of various Delphi utilities. I hope you find them useful.
 
-I hope you find them useful.
-
-**TFastLookupStringList** - has the exact same functionality as a TStringList
+**TFastLookupStringList** – has the exact same functionality as a TStringList,
 but does fast lookups (IndexOf) even if it is not sorted.
 It accomplishes this by using an internal dictionary.
 
@@ -15,4 +13,5 @@ or more, but most notably useful with, say, tens of thousands of items).
 This class uses its internal dictionary only when Sorted = False.
 When Sorted = True, it handles everything using TStringList's original methods.
 
-It should work on all versions of Delphi (has been tested on Delphi 7, XE2 and Tokyo).
+It should work on all versions of Delphi that support generics 
+(has been tested on Delphi XE2 and Tokyo).
