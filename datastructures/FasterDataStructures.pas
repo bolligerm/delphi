@@ -3,7 +3,7 @@ unit FasterDataStructures;
 {
 MIT License
 
-Copyright (c) 2018 Matthias Bolliger
+Copyright (c) 2018-2021 Matthias Bolliger
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -46,9 +46,6 @@ type
   // Insights from:
   // https://www.delphitools.info/2015/03/17/long-strings-hash-vs-sorted-vs-unsorted/
   //
-  // TODO: Known issues:
-  // - Clean up code that is not needed in RecreateLookupDict
-  //
   TFastLookupStringList = class(TStringList)
   {$IF RTLVersion < 32.0}
   private
@@ -72,7 +69,7 @@ type
 
     procedure CheckForChangedCaseSensitiveOrSorted; inline;
     function Dictify(const s: string): string; inline;
-    procedure RecreateLookupDict;
+    procedure CreateLookupDict;
     procedure RebuildLookupDict;
     procedure ReflectOverwrittenItemInDict(const OldString: string);
     procedure ReflectInsertedItemInDict(Index: Integer; const S: string;
@@ -107,34 +104,34 @@ uses
 constructor TFastLookupStringList.Create;
 begin
   inherited;
-  RecreateLookupDict;
+  CreateLookupDict;
 end;
 
 constructor TFastLookupStringList.Create(OwnsObjects: Boolean);
 begin
   inherited;
-  RecreateLookupDict;
+  CreateLookupDict;
 end;
 
 {$IF RTLVersion >= 32.0}
 constructor TFastLookupStringList.Create(QuoteChar, Delimiter: Char);
 begin
   inherited;
-  RecreateLookupDict;
+  CreateLookupDict;
 end;
 
 constructor TFastLookupStringList.Create(QuoteChar, Delimiter: Char;
   Options: TStringsOptions);
 begin
   inherited;
-  RecreateLookupDict;
+  CreateLookupDict;
 end;
 
 constructor TFastLookupStringList.Create(Duplicates: TDuplicates; Sorted,
   CaseSensitive: Boolean);
 begin
   inherited;
-  RecreateLookupDict;
+  CreateLookupDict;
 end;
 {$IFEND}
 
@@ -168,17 +165,6 @@ end;
 
 procedure TFastLookupStringList.CheckForChangedCaseSensitiveOrSorted;
 begin
-(*
-  // The following recreation is no longer needed,
-  // since we added Dictify():
-
-  // If the list's CaseSensitive or UseLocale property has changed since last time we looked at it,
-  // then we must recreate the whole LookupDict
-  // (using the appropriate StringComparer)
-  if (FWasCaseSensitive <> CaseSensitive) or (FWasUseLocale <> UseLocale) then
-    RecreateLookupDict;
-*)
-
   // If we are non-Sorted, then we need the dictionary.
   // The dictionary needs a full rebuild if
   // the list was Sorted last time we looked at it (but now isn't),
@@ -195,12 +181,6 @@ end;
 procedure TFastLookupStringList.Assign(Source: TPersistent);
 begin
   BeginUpdate;
-  if (Source is TStringList) and (
-  {$IF RTLVersion >= 32.0}
-      (TStringList(Source).UseLocale <> UseLocale) or
-  {$IFEND}
-      (TStringList(Source).CaseSensitive <> CaseSensitive)) then
-    RecreateLookupDict;
   if (Source is TStringList) and TStringList(Source).Sorted then
     FLookupDict.Clear;  // Just to save memory, not really necessary functionally
   inherited;
@@ -238,10 +218,10 @@ begin
   end
   else
   begin
-    // Shift items down
+    // Shift items after the deleted one "to the left"
     for DictItem in FLookupDict do
       if DictItem.Value > Index then  // If this item was "to the right" of the deleted one,
-        FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step down.
+        FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step "to the left".
 
     // Remove or re-point OldString in the dictionary
     ReflectOverwrittenItemInDict(OldString);
@@ -282,7 +262,7 @@ begin
     // The string that has moved "up" (i.e. is now at the larger index)
     // may have jumped past another occurence of the same string,
     // and that one is now the first occurrence. Must check for this
-    // using the inherited (slow) IndexOf, and updated the dictionary accordingly
+    // using the inherited (slow) IndexOf, and update the dictionary accordingly
     if Index2 > Index1 then
     begin
       FLookupDict[Dictify(s1)] := Min(Index2, inherited IndexOf(s1));
@@ -335,10 +315,11 @@ begin
     if Index < Count - 1 then
     begin
       // S was added somewhere inside the list (not at the end)
-      // - in this case, we need to update all shifted indexes in the dictionary
+      // - in this case, we need to update all shifted indexes in the dictionary:
+      // Shift items at or after the inserted one "to the right"
       for DictItem in FLookupDict do
         if DictItem.Value >= Index then  // If this item was at or "to the right" of the newly inserted one,
-          FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step up.
+          FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step "to the right".
     end;
 
     // Add the new item to the dictionary.
@@ -387,32 +368,9 @@ begin
   EndUpdate;
 end;
 
-procedure TFastLookupStringList.RecreateLookupDict;
+procedure TFastLookupStringList.CreateLookupDict;
 begin
-  // This recreation is no longer needed,
-  // since we added Dictify().
-  // Now we just create the dict here, just once,
-  // and never really recreate it any more.
-  if FLookupDict = nil then
-    FLookupDict := TDictionary<string, Integer>.Create;
-
-(*
-  FLookupDict.Free;
-
-  // An other option would have been:
-  // FLookupDict := TDictionary<string, Integer>.Create(GetStringComparer(UseLocale, CaseSensitive));
-  // using unit LocaleAwareStringComparers
-
-  // The following, third option works OK with regard to CaseSensitive,
-  // but does not honor UseLocale
-  // (it will always work as if UseLocale = True):
-  if CaseSensitive then
-    // The default dictionary is case-sensitive
-    FLookupDict := TDictionary<string, Integer>.Create
-  else
-    // TIStringComparer.Ordinal makes it case-insensitive
-    FLookupDict := TDictionary<string, Integer>.Create(TIStringComparer.Ordinal);
-*)
+  FLookupDict := TDictionary<string, Integer>.Create;
 end;
 
 procedure TFastLookupStringList.RebuildLookupDict;
