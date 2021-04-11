@@ -1,0 +1,16 @@
+#!/bin/sh
+# Check *.dfm files being committed for any ExplicitXxxx properties, and remove them if they exist
+# Written by Matthias Bolliger, inspired by:
+# https://askubuntu.com/questions/354993/how-to-remove-lines-from-the-text-file-containing-specific-words-through-termina
+
+for filename in $(git diff --cached --name-only *.dfm); do
+	# It's actually faster without the separate grep step - but the output would echo all files then, so keep the grep
+	grep -q 'Explicit' $filename
+	if [ $? = 0 ]; then
+		echo Removing ExplicitLeft/ExplicitTop/ExplicitWidth/ExplicitHeight properties from $filename
+		# Must use -bi, not just -i, because otherwise sed would Unixify line endings (only LF instead of CRLF)
+		sed -bi "/\b\(ExplicitLeft =\|ExplicitTop =\|ExplicitWidth =\|ExplicitHeight =\)/d" $filename > /dev/null
+		git add $filename
+	fi
+done
+exit 0
