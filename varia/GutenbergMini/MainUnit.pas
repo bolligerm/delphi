@@ -19,6 +19,7 @@ type
     Edit1: TEdit;
     Label1: TLabel;
     CopiesEdit: TEdit;
+    GrayscaleCheckBox: TCheckBox;
     procedure OpenButtonClick(Sender: TObject);
     procedure PrintButtonClick(Sender: TObject);
   private
@@ -48,7 +49,7 @@ var
   Copies: Integer;
 begin
   Copies := StrToInt(CopiesEdit.Text);
-  WebView2PrintCopies(EdgeBrowser1, Copies, PrintingIsDone);
+  WebView2PrintCopies(EdgeBrowser1, Copies, GrayscaleCheckBox.Checked, PrintingIsDone);
 end;
 
 procedure TForm1.PrintingIsDone(ErrorCode: HResult; PrintStatus: TPrintStatus);

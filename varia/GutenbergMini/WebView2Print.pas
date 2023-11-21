@@ -20,7 +20,9 @@ type
   TCallWhenDonePrinting = procedure(ErrorCode: HResult; PrintStatus: TPrintStatus) of object;
 
 procedure WebView2PrintCopies(EdgeBrowser: TCustomEdgeBrowser;
-  Copies: Integer; CallWhenDone: TCallWhenDonePrinting);
+  Copies: Integer;
+  Grayscale: Boolean;
+  CallWhenDone: TCallWhenDonePrinting);
 
 
 implementation
@@ -38,7 +40,9 @@ threadvar
   CallWhenDonePrinting: TCallWhenDonePrinting;
 
 procedure WebView2PrintCopies(EdgeBrowser: TCustomEdgeBrowser;
-  Copies: Integer; CallWhenDone: TCallWhenDonePrinting);
+  Copies: Integer;
+  GrayScale: Boolean;
+  CallWhenDone: TCallWhenDonePrinting);
 var
   Core2: ICoreWebView2;
   Core2_16: ICoreWebView2_16;
@@ -87,6 +91,9 @@ begin
 
   // Set the wanted number of copies (could also set other settings here)
   PrintSettings2.Set_Copies(Copies);
+  // Maybe ask for grayscale printing
+  if GrayScale then
+    PrintSettings2.Set_ColorMode(COREWEBVIEW2_PRINT_COLOR_MODE_GRAYSCALE);
 
   // Since this variable is of interface type, the object will get auto-Freed
   CompletedHandler := TCompletedHandler.Create;
