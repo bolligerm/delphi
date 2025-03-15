@@ -3,7 +3,7 @@ unit FasterDataStructures;
 {
 MIT License
 
-Copyright (c) 2018-2021 Matthias Bolliger
+Copyright (c) 2018-2025 Matthias Bolliger
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

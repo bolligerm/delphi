@@ -1,1 +1,0 @@
-Add a variant of TStringList with faster lookup

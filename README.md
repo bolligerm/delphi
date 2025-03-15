@@ -14,4 +14,4 @@ This class uses its internal dictionary only when Sorted = False.
 When Sorted = True, it handles everything using TStringList's original methods.
 
 It should work on all versions of Delphi that support generics 
-(has been tested on Delphi XE2, 10.2 Tokyo, 10.4 Sydney, 11.3 Alexandria and 12 Athens).
+(has been tested on Delphi XE2, 10.2 Tokyo, 10.4 Sydney, 11.3 Alexandria and 12.3 Athens).
