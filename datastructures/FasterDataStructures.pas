@@ -1,4 +1,4 @@
-unit FasterDataStructures;
+﻿unit FasterDataStructures;
 
 {
 MIT License
@@ -204,6 +204,8 @@ procedure TFastLookupStringList.Delete(Index: Integer);
 var
   DictItem: TPair<string, Integer>;
   OldString: string;
+  ShiftKeys: TList<string>;
+  Key: string;
 begin
   BeginUpdate;
   OldString := Strings[Index];  // Remember the old string (the one at the index that will now be overwritten)
@@ -219,9 +221,16 @@ begin
   else
   begin
     // Shift items after the deleted one "to the left"
-    for DictItem in FLookupDict do
-      if DictItem.Value > Index then  // If this item was "to the right" of the deleted one,
-        FLookupDict[DictItem.Key] := DictItem.Value - 1;  // then shift its index (the value) one step "to the left".
+    ShiftKeys := TList<string>.Create;  // To avoid modifying the dictionary while iterating through it
+    try
+      for DictItem in FLookupDict do
+        if DictItem.Value > Index then  // If this item was "to the right" of the deleted one,
+          ShiftKeys.Add(DictItem.Key);  // then shift its index (the value) one step "to the left"
+      for Key in ShiftKeys do
+        FLookupDict[Key] := FLookupDict[Key] - 1;
+    finally
+      ShiftKeys.Free;
+    end;
 
     // Remove or re-point OldString in the dictionary
     ReflectOverwrittenItemInDict(OldString);
@@ -294,6 +303,8 @@ procedure TFastLookupStringList.InsertItem(Index: Integer; const S: string;
 var
   DictItem: TPair<string, Integer>;
   AlreadyExisted: Boolean;
+  ShiftKeys: TList<string>;
+  Key: string;
 begin
   BeginUpdate;
 
@@ -317,9 +328,16 @@ begin
       // S was added somewhere inside the list (not at the end)
       // - in this case, we need to update all shifted indexes in the dictionary:
       // Shift items at or after the inserted one "to the right"
-      for DictItem in FLookupDict do
-        if DictItem.Value >= Index then  // If this item was at or "to the right" of the newly inserted one,
-          FLookupDict[DictItem.Key] := DictItem.Value + 1;  // then shift its index (the value) one step "to the right".
+      ShiftKeys := TList<string>.Create;  // To avoid modifying the dictionary while iterating through it
+      try
+        for DictItem in FLookupDict do
+          if DictItem.Value >= Index then  // If this item was at or "to the right" of the newly inserted one,
+            ShiftKeys.Add(DictItem.Key);   // then shift its index (the value) one step "to the right".
+        for Key in ShiftKeys do
+          FLookupDict[Key] := FLookupDict[Key] + 1;
+      finally
+        ShiftKeys.Free;
+      end;
     end;
 
     // Add the new item to the dictionary.

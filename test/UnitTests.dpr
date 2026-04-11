@@ -1,4 +1,4 @@
-program UnitTests;
+﻿program UnitTests;
 {
 
   Delphi DUnit Test Project

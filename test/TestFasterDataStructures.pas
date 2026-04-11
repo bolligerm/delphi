@@ -1,4 +1,4 @@
-unit TestFasterDataStructures;
+Ôªøunit TestFasterDataStructures;
 {
 
   Delphi DUnit Test Case
@@ -33,6 +33,9 @@ type
     procedure TestPut;
     procedure TestInsert;
     procedure TestCaseInsensitive;
+    procedure TestDeleteWithDuplicates;
+    procedure TestCaseLocaleToggleKeepsIndexes;
+    procedure TestSortedToggleRebuildsDictionary;
   end;
 
 implementation
@@ -108,39 +111,39 @@ end;
 procedure TestTFastLookupStringList.TestCaseInsensitive;
 begin
   // Add a string with letters outside a-z (to make UseLocale matter)
-  FFastLookupStringList.Add('’una s¸da');
+  FFastLookupStringList.Add('√ïuna s√ºda');
 
   // Here UseLocale = True (the default)
   FFastLookupStringList.CaseSensitive := False;
   CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-insensitive list, a');
   CheckEquals(2, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-insensitive list, b');
-  CheckEquals(5, FFastLookupStringList.IndexOf('’una s¸da'), 'IndexOf in case-insensitive list, c');
-  CheckEquals(5, FFastLookupStringList.IndexOf('ıuNA S‹da'), 'IndexOf in case-insensitive list, d');  // INTERESTING DIFFERENCE
+  CheckEquals(5, FFastLookupStringList.IndexOf('√ïuna s√ºda'), 'IndexOf in case-insensitive list, c');
+  CheckEquals(5, FFastLookupStringList.IndexOf('√µuNA S√úda'), 'IndexOf in case-insensitive list, d');  // INTERESTING DIFFERENCE
   FFastLookupStringList.CaseSensitive := True;
   CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in case-sensitive list, a');
   CheckEquals(-1, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in case-sensitive list, b');
-  CheckEquals(5, FFastLookupStringList.IndexOf('’una s¸da'), 'IndexOf in case-sensitive list, c');
-  CheckEquals(-1, FFastLookupStringList.IndexOf('ıuNA S‹da'), 'IndexOf in case-sensitive list, d');
+  CheckEquals(5, FFastLookupStringList.IndexOf('√ïuna s√ºda'), 'IndexOf in case-sensitive list, c');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('√µuNA S√úda'), 'IndexOf in case-sensitive list, d');
 
   // Now we set UseLocale = False
 {$IF RTLVersion >= 32.0}
   FFastLookupStringList.UseLocale := False;
   CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in non-locale case-sensitive list, a');
   CheckEquals(-1, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in non-locale case-sensitive list, b');
-  CheckEquals(5, FFastLookupStringList.IndexOf('’una s¸da'), 'IndexOf in non-locale case-sensitive list, c');
-  CheckEquals(-1, FFastLookupStringList.IndexOf('ıuNA S‹da'), 'IndexOf in non-locale case-sensitive list, d');
+  CheckEquals(5, FFastLookupStringList.IndexOf('√ïuna s√ºda'), 'IndexOf in non-locale case-sensitive list, c');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('√µuNA S√úda'), 'IndexOf in non-locale case-sensitive list, d');
   FFastLookupStringList.CaseSensitive := False;
   CheckEquals(2, FFastLookupStringList.IndexOf('Original Third'), 'IndexOf in non-locale case-insensitive list, a');
   CheckEquals(2, FFastLookupStringList.IndexOf('Original THIRD'), 'IndexOf in non-locale case-insensitive list, b');
-  CheckEquals(5, FFastLookupStringList.IndexOf('’una s¸da'), 'IndexOf in non-locale case-insensitive list, c');
-  CheckEquals(-1, FFastLookupStringList.IndexOf('ıuNA S‹da'), 'IndexOf in non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
+  CheckEquals(5, FFastLookupStringList.IndexOf('√ïuna s√ºda'), 'IndexOf in non-locale case-insensitive list, c');
+  CheckEquals(-1, FFastLookupStringList.IndexOf('√µuNA S√úda'), 'IndexOf in non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
 
   // Set UseLocale = True again
   FFastLookupStringList.UseLocale := True;
-  CheckEquals(5, FFastLookupStringList.IndexOf('ıuNA S‹da'), 'IndexOf in again-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
+  CheckEquals(5, FFastLookupStringList.IndexOf('√µuNA S√úda'), 'IndexOf in again-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
   // Set UseLocale = False again
   FFastLookupStringList.UseLocale := False;
-  CheckEquals(-1, FFastLookupStringList.IndexOf('ıuNA S‹da'), 'IndexOf in again-non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
+  CheckEquals(-1, FFastLookupStringList.IndexOf('√µuNA S√úda'), 'IndexOf in again-non-locale case-insensitive list, d');  // INTERESTING DIFFERENCE
 {$IFEND}
 end;
 
@@ -279,8 +282,53 @@ begin
   CheckEquals(6, FFastLookupStringList.Count, 'G After Insert+Delete 2');
 end;
 
+procedure TestTFastLookupStringList.TestDeleteWithDuplicates;
+begin
+  FFastLookupStringList.Clear;  // Do not use the values from SetUp
+  FFastLookupStringList.Add('Duplicate');
+  FFastLookupStringList.Add('Extra');
+  FFastLookupStringList.Add('Duplicate');
+  CheckEquals(0, FFastLookupStringList.IndexOf('Duplicate'), 'IndexOf duplicate before deletes');
+  FFastLookupStringList.Delete(0);
+  CheckEquals(1, FFastLookupStringList.IndexOf('Duplicate'), 'IndexOf duplicate after deleting first occurrence');
+  FFastLookupStringList.Delete(1);
+  CheckEquals(-1, FFastLookupStringList.IndexOf('Duplicate'), 'IndexOf duplicate after deleting remaining occurrences');
+end;
+
+procedure TestTFastLookupStringList.TestCaseLocaleToggleKeepsIndexes;
+begin
+  FFastLookupStringList.Clear;  // Do not use the values from SetUp
+  FFastLookupStringList.Add('√Åccent');
+  FFastLookupStringList.Add('√°ccent');
+  FFastLookupStringList.CaseSensitive := False;
+  CheckEquals(0, FFastLookupStringList.IndexOf('√°ccent'), 'IndexOf case-insensitive before locale toggles');
+{$IF RTLVersion >= 32.0}
+  FFastLookupStringList.UseLocale := False;
+  CheckEquals(1, FFastLookupStringList.IndexOf('√°ccent'), 'IndexOf with UseLocale = False');
+  FFastLookupStringList.UseLocale := True;
+  CheckEquals(0, FFastLookupStringList.IndexOf('√°ccent'), 'IndexOf after restoring UseLocale = True');
+{$IFEND}
+  FFastLookupStringList.CaseSensitive := True;
+  CheckEquals(0, FFastLookupStringList.IndexOf('√Åccent'), 'IndexOf case-sensitive after toggling back');
+end;
+
+procedure TestTFastLookupStringList.TestSortedToggleRebuildsDictionary;
+begin
+  FFastLookupStringList.Clear;  // Do not use the values from SetUp
+  FFastLookupStringList.Sorted := True;
+  FFastLookupStringList.Duplicates := dupAccept;
+  FFastLookupStringList.Add('Zebra');
+  FFastLookupStringList.Add('Apple');
+  FFastLookupStringList.Add('Apple');
+  FFastLookupStringList.Sorted := False;
+  CheckEquals(0, FFastLookupStringList.IndexOf('Apple'), 'IndexOf after toggling Sorted off');
+  FFastLookupStringList.Delete(0);
+  CheckEquals(0, FFastLookupStringList.IndexOf('Apple'), 'IndexOf after deleting the first item');
+  FFastLookupStringList.Delete(0);
+  CheckEquals(-1, FFastLookupStringList.IndexOf('Apple'), 'IndexOf after removing the remaining Apple entries');
+end;
+
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestTFastLookupStringList.Suite);
 end.
-
